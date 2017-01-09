@@ -2,7 +2,7 @@
 pickles/
 .ipynb_checkpoints/
 *.zip
-#networks/
+networks/
 
 # Python stuff
 # Byte-compiled / optimized / DLL files
