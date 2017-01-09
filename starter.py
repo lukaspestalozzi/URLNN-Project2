@@ -9,7 +9,7 @@ from neuronalnetwork import State
 from collections import defaultdict
 import argparse
 
-def visualize_trial(agent, n_steps=200, time_step=1.0):
+def visualize_trial(agent, n_steps=200):
     """Do a trial without learning, with display.
 
     Parameters
