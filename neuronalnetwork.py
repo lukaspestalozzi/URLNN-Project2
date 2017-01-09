@@ -224,7 +224,7 @@ class MountainCarNeuronalNetwork(object):
 
     def _episode(self, mountain_car, learning_rate, reward_factor, eligibility_decay, n_steps, step_penalty):
 
-        mountain_car.reset(random=True)
+        mountain_car.reset(random=False)
         self._reset_E() # set all e to 0
 
         curr_state = State(mountain_car.x, mountain_car.x_d)

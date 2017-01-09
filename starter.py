@@ -74,18 +74,18 @@ class SarsaAgent():
         else:
             self.mountain_car = mountain_car
 
-        self.NN = nn.MountainCarNeuronalNetwork(warm_start=warm_start, nbr_neuron_rows=10, nbr_neuron_cols=10, init_weight=0.5)
+        self.NN = nn.MountainCarNeuronalNetwork(warm_start=warm_start, nbr_neuron_rows=5, nbr_neuron_cols=5, init_weight=1.0)
 
     def choose_action(self, state):
         return self.NN.choose_action(state)
 
     def train(self,
-              n_steps=2000,
+              n_steps=1500,
               n_episodes=500,
-              learning_rate=0.01,
+              learning_rate=0.001,
               reward_factor=0.95,
-              eligibility_decay=0.6,
-              step_penalty=-0.01,
+              eligibility_decay=0.7,
+              step_penalty=-0.0,
               tau=0.1):
         print("NN history:", self.NN.history)
         self.NN.show_output(figure_name='start')
@@ -104,7 +104,7 @@ class SarsaAgent():
         plb.plot(sucess_indexes, 'o')
         W = max(int(n_episodes/20), 10)
         mean_arr = [n_steps]*W + [np.mean(sucess_indexes[k-W:k]) for k in range(W, len(sucess_indexes))]
-        plb.plot(mean_arr, 'r')
+        plb.plot(range(W, len(mean_arr)+W), mean_arr, 'r')
         #plb.figure()
         #for t in traces:
         #    plb.plot([s.x for s in t], [s.v for s in t])
