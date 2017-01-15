@@ -69,47 +69,49 @@ class OptimalAgent():
 class SarsaAgent():
     def __init__(self,warm_start=None):
 
-        self.NN = nn.MountainCarNeuronalNetwork(warm_start=warm_start, nbr_neuron_rows=25, nbr_neuron_cols=25, init_weight=1.0)
+        self.NN = nn.MountainCarNeuronalNetwork(warm_start=warm_start, nbr_neuron_rows=15, nbr_neuron_cols=15, init_weight=1.0)
 
     def choose_action(self, state):
         return self.NN.choose_action(state)
 
-    def train(self,
-              n_steps=1500,
-              n_episodes=500,
-              learning_rate=0.01,
-              reward_factor=0.95,
-              eligibility_decay=0.7,
-              step_penalty=-0.0,
-              tau=0.2):
+    def train(self, n_steps=None, n_episodes=None):
         print("NN history:", self.NN.history)
         self.NN.show_output(figure_name='start')
-        sucess_indexes = self.NN.train(n_steps=n_steps, n_episodes=n_episodes,
-                                       learning_rate=learning_rate,
-                                       reward_factor=reward_factor,
-                                       eligibility_decay=eligibility_decay,
-                                       step_penalty=step_penalty,
-                                       tau=tau,
+        epis = 1000 if n_episodes is None else n_episodes
+        sucess_indexes = self.NN.train(n_steps=2000 if n_steps is None else n_steps,
+                                       n_episodes=epis,
+                                       reward_factor=0.95,
+                                       eligibility_decay=0.8,
+                                       step_penalty=-0.0,
+                                       init_learning_rate=0.01,
+                                       duration_learingrate=epis-500,
+                                       target_learning_rate=0.01,
+                                       min_learning_rate=0.01,
+                                       init_tau=0.2,
+                                       duration_tau=epis,
+                                       target_tau=0.1,
+                                       min_tau=0.2, # to ensure some exploration (similar to e-greedy)
                                        save_to_file=True,
                                        show_intermediate=False,
-                                       show_trace=True)
+                                       show_trace=False)
         print(self.NN)
         self.NN.show_output(figure_name='last')
 
         # show learning curve
         plb.figure()
         plb.plot(sucess_indexes, 'o')
-        W = max(int(n_episodes/20), 10)
+        W = 50
         mean_arr = [np.mean(sucess_indexes[k-W:k]) for k in range(W, len(sucess_indexes))]
         plb.plot(range(W, len(mean_arr)+W), mean_arr, 'r')
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Mountain Car with a neuronal network')
     parser.add_argument('-f', dest='filename', required=False, default=None)
+    parser.add_argument('-s', dest='n_steps', required=False, default=None, type=int)
+    parser.add_argument('-e', dest='n_episodes', required=False, default=None, type=int)
     args = parser.parse_args()
     print("args:", args)
 
     agent = SarsaAgent(warm_start=args.filename)
-    agent.train()
-    #visualize_trial(agent, n_steps=2000)
+    agent.train(n_steps=args.n_steps, n_episodes=args.n_episodes)
     plb.show(block=True)
