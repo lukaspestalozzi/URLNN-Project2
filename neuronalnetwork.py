@@ -106,7 +106,8 @@ class MountainCarNeuronalNetwork(object):
             'history':self.history
         }
         print("saving NN:\n", d)
-        path = 'networks/r{}_c{}/'.format(self._nbr_neurons_rows, self._nbr_neurons_cols)
+        #path = 'networks/r{}_c{}/'.format(self._nbr_neurons_rows, self._nbr_neurons_cols)
+        path = 'networks/average_10/'
         assure_path_exists(path)
         filename = '{}nn_{}.json'.format(path, strftime('%d_%m_%Y-%H:%M:%S'))
         with open(filename, 'w') as f:
@@ -149,12 +150,12 @@ class MountainCarNeuronalNetwork(object):
         q = self._get_Q_all(state, activs=in_activs)
         denominator = np.sum(np.exp(q / tau))
 
-        if denominator == np.inf: # handle nummeric overflow
+        if denominator == np.inf or denominator == np.nan: # handle nummeric overflow
             print("(info: overflow occured)")
             return self._greedy_output(q)
 
         op_activs = np.exp(q / tau) / denominator
-        if np.inf in op_activs: # handle nummeric overflow
+        if np.inf in op_activs or np.nan in op_activs: # handle nummeric overflow
             print("(info: overflow occured)")
             return self._greedy_output(q)
         else:
@@ -188,7 +189,7 @@ class MountainCarNeuronalNetwork(object):
         multiplies the E value of the corresponding neuron by eligibility_decay
         """
         self._neurons_e *= eligibility_decay
-        self._neurons_e[self._neurons_e < 0.000001] = 0 # set small values to 0
+        self._neurons_e[self._neurons_e < 0.000001] = 0.0 # set small values to 0
 
     def _increment_E(self, state, action, activs=None):
         """
@@ -200,13 +201,6 @@ class MountainCarNeuronalNetwork(object):
         # truncuate at 1
         self._neurons_e[self._neurons_e > 1] = 1
 
-    def _update_Q(self, state, action, delta_q):
-        """
-        adds the delta_q to the weights the corresponding neuron and action weighted by the eligibility value
-        """
-        a_idx = action+1
-        #print(state, action, "->", delta_q)
-        self._neurons_w[:, a_idx] += self._neurons_e[:, a_idx]*delta_q
 
     def _reset_E(self):
         self._neurons_e = np.zeros((self.nbr_neurons, 3), dtype=float)
@@ -234,11 +228,6 @@ class MountainCarNeuronalNetwork(object):
         show_trace: if True, shows the trace of the car for each episode
         """
 
-        """
-        TOTRY: Try do keep track of a learning rate for each neuron: alpha(neuron) = 1/sum of activations of n.
-        Or even keep a learning rate per neuron pair and use it as alpha(n1, n2) = #visitations to n2/#visitations to n1 (needs to be adapted to neuron activations)
-
-        """
         #parameter checks
         assert init_tau > 0.0
         assert init_learning_rate != 0.0
@@ -273,14 +262,17 @@ class MountainCarNeuronalNetwork(object):
             # update tau and learning rate
             tau = max(min_tau, tau*tau_update_factor)
             learning_rate = max(min_learning_rate, learning_rate*learning_rate_update_factor)
+            #learning_rate = max(min_learning_rate, 1.0/np.sqrt(ep+44)) # sqrt
+
+
 
             t = time()
             # show some stuff
-            self.show_output(figure_name='activations_interactive', interactive=True)
+            self.show_output(figure_name='activations_interactive', tau=tau, interactive=True)
             if show_trace is True or (show_trace == 'not_succeeded' and idx > n_steps-2):
                 self.show_trace(figure_name='trace_interactive', trace=trace, interactive=True)
             if show_intermediate and ep % 100 == 99:
-                self.show_output(figure_name='activations_'+str(ep), interactive=False)
+                self.show_output(figure_name='activations_'+str(ep), tau=tau, interactive=False)
 
             print("  plot_t={:.4f}s".format(time()-t))
         #end for episodes
@@ -303,7 +295,7 @@ class MountainCarNeuronalNetwork(object):
 
     def _episode(self, mountain_car, learning_rate, reward_factor, eligibility_decay, n_steps, step_penalty, tau):
 
-        mountain_car.reset(random=True)
+        mountain_car.reset(random=False)
         self._reset_E() # set all e to 0
 
         curr_state = State(mountain_car.x, mountain_car.x_d)
@@ -330,7 +322,7 @@ class MountainCarNeuronalNetwork(object):
             delta_q = learning_rate*(r + reward_factor*next_Q - curr_Q)
 
             self._increment_E(curr_state, curr_action, activs=curr_in_activs)
-            self._update_Q(curr_state, curr_action, delta_q)
+            self._neurons_w += self._neurons_e*delta_q # self._update_Q(curr_state, curr_action, delta_q)
             self._decay_E(eligibility_decay)
 
             curr_state = next_state
@@ -354,7 +346,7 @@ class MountainCarNeuronalNetwork(object):
         plt.ion()
         plt.figure("activation")
         plt.clf()
-        plt.imshow(activs_matrix, interpolation='none')
+        plt.imshow(activs_matrix, interpolation='nearest')
         plt.xticks(self._x_ticks[0], self._x_ticks[1], rotation=90.0)
         plt.yticks(self._y_ticks[0], self._y_ticks[1])
         plt.xlabel("position")
@@ -362,11 +354,11 @@ class MountainCarNeuronalNetwork(object):
         plt.pause(0.00000001)
         plt.show(block=block)
 
-    def show_output(self, figure_name, block=False, interactive=False):
+    def show_output(self, figure_name, tau, block=False, interactive=False):
         """
-        Shows the output neurons (ie. the actions) for each state (calculated with tau = 1.0. ie. unbiased towards exploration/exploitation)
+        Shows the output neurons (ie. the actions) for each state
         """
-        outputs_arr = np.array([self.output_activations(State(n_x, n_v), 1.0) for n_x, n_v in self._neurons_pos])
+        outputs_arr = np.array([self.output_activations(State(n_x, n_v), tau) for n_x, n_v in self._neurons_pos])
 
         # reshape and rotate by 90°
         outputs_matrix = np.rot90(outputs_arr.reshape((self._nbr_neurons_rows, self._nbr_neurons_cols, 3)), 1)
@@ -376,7 +368,7 @@ class MountainCarNeuronalNetwork(object):
             plt.ioff()
         plt.figure(figure_name)
         plt.clf()
-        plt.imshow(outputs_matrix, interpolation='none')#, interpolation='gaussian')
+        plt.imshow(outputs_matrix, interpolation='nearest')#, interpolation='gaussian')
         plt.xticks(self._x_ticks[0], self._x_ticks[1], rotation=90.0)
         plt.yticks(self._y_ticks[0], self._y_ticks[1])
         plt.xlabel("position")
