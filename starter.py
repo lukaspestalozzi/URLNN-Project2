@@ -80,7 +80,7 @@ class SarsaAgent():
     def train(self, n_steps=None, n_episodes=None):
         print("NN history:", self.NN.history)
         self.NN.show_output(figure_name='start', tau=0.5)
-        epis = 5000 if n_episodes is None else n_episodes
+        epis = 11000 if n_episodes is None else n_episodes
         self.NN.train( n_steps=2000 if n_steps is None else n_steps,
                        n_episodes=epis,
                        reward_factor=0.95,
