@@ -79,34 +79,29 @@ class SarsaAgent():
 
     def train(self, n_steps=None, n_episodes=None):
         print("NN history:", self.NN.history)
-        self.NN.show_output(figure_name='start', tau=1.0)
-        epis = 4000 if n_episodes is None else n_episodes
-        sucess_indexes = self.NN.train(n_steps=2000 if n_steps is None else n_steps,
-                                       n_episodes=epis,
-                                       reward_factor=0.95,
-                                       eligibility_decay=0.9,
-                                       step_penalty=-0.0,
-                                       init_learning_rate=0.15,
-                                       duration_learingrate=2000,
-                                       target_learning_rate=0.03,
-                                       min_learning_rate=0.03,
-                                       init_tau=1.2,
-                                       duration_tau=4000,
-                                       target_tau=0.5,
-                                       min_tau=0.3, # to ensure some exploration (similar to e-greedy)
-                                       save_to_file=True,
-                                       show_intermediate=False,
-                                       show_trace=False)
-        # try 1/log(t) and 1/sqrt(t)-> better
-        print(self.NN)
-        self.NN.show_output(figure_name='last', tau=1.0)
+        self.NN.show_output(figure_name='start', tau=0.5)
+        epis = 5000 if n_episodes is None else n_episodes
+        self.NN.train( n_steps=2000 if n_steps is None else n_steps,
+                       n_episodes=epis,
+                       reward_factor=0.95,
+                       eligibility_decay=0.9,
+                       step_penalty=-0.0,
+                       init_learning_rate=0.02,
+                       duration_learingrate=1,
+                       target_learning_rate=0.02,
+                       min_learning_rate=0.02,
+                       init_tau=0.1,
+                       duration_tau=2000,
+                       target_tau=0.01,
+                       min_tau=0.01, # to ensure some exploration (similar to e-greedy)
+                       save_to_file=True,
+                       show_intermediate=False,
+                       show_trace=False,
+                       show_interactive=False,
+                       show_weights=False)
 
-        # show learning curve
-        plb.figure()
-        plb.plot(sucess_indexes, 'o')
-        W = 500
-        mean_arr = [np.mean(sucess_indexes[k-W:k]) for k in range(W, len(sucess_indexes))]
-        plb.plot(range(W, len(mean_arr)+W), mean_arr, 'r', linewidth=2)
+        print(self.NN)
+        self.NN.display_network(name="after training")
 
 
 

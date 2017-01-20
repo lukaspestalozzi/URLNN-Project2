@@ -105,9 +105,9 @@ class MountainCarNeuronalNetwork(object):
             'weights':self._neurons_w.tolist(),
             'history':self.history
         }
-        print("saving NN:\n", d)
-        #path = 'networks/r{}_c{}/'.format(self._nbr_neurons_rows, self._nbr_neurons_cols)
-        path = 'networks/average_10/'
+        print("saving NN:\n")
+        path = 'networks/r{}_c{}_e{}_sp{}/'.format(self._nbr_neurons_rows, self._nbr_neurons_cols, self.history[-1]['eligibility_decay'], self.history[-1]['step_penalty'])
+        #path = 'networks/average_10/'
         assure_path_exists(path)
         filename = '{}nn_{}.json'.format(path, strftime('%d_%m_%Y-%H:%M:%S'))
         with open(filename, 'w') as f:
@@ -219,7 +219,7 @@ class MountainCarNeuronalNetwork(object):
               min_learning_rate=0.005,
               min_tau=0.01, # must not be lower than 0.01
               step_penalty=-0.1, mountain_car=None, save_to_file=True, show_intermediate=False,
-              show_trace=False):
+              show_trace=False, show_interactive=True, show_weights=False):
         """
         duration_*: positive integer. Determines at which episode the * parameter reaches it's minimum value. Note that the parameter continues to shrink when it reached the target_learning_rate value.
         min_*: spezifies a lower bound on the * parameter
@@ -249,14 +249,26 @@ class MountainCarNeuronalNetwork(object):
         if n_steps is None:
             n_steps = float('inf')
 
-        sucess_indexes = []
+        # init history
+        self.history.append({ 'episodes' :n_episodes,
+                              'steps' :n_steps,
+                              'init_learning_rate':init_learning_rate, 'duration_learingrate':duration_learingrate, 'target_learning_rate':target_learning_rate, "min_learning_rate":min_learning_rate,
+                              'init_tau':init_tau, 'duration_tau':duration_tau, 'target_tau':target_tau, "min_tau":min_tau,
+                              'eligibility_decay' :eligibility_decay,
+                              'step_penalty' :step_penalty,
+                              'reward_factor':reward_factor,
+                              'eligibility_decay':eligibility_decay,
+                              'step_penalty':step_penalty,
+                              'sucess_indexes' :[],
+                              })
+
         for ep in range(n_episodes):
             # run episode
             t = time()
             print("episode", ep, "/", n_episodes, "tau:", tau, "lrate:", learning_rate)
             idx, trace = self._episode(mountain_car, learning_rate=learning_rate, reward_factor=reward_factor,
                                        eligibility_decay=eligibility_decay, n_steps=n_steps, step_penalty=step_penalty, tau=tau)
-            sucess_indexes.append(idx)
+            self.history[-1]['sucess_indexes'].append(idx)
             print("  calc_t={:.4f}s".format(time()-t))
 
             # update tau and learning rate
@@ -268,22 +280,21 @@ class MountainCarNeuronalNetwork(object):
 
             t = time()
             # show some stuff
-            self.show_output(figure_name='activations_interactive', tau=tau, interactive=True)
+            if show_interactive:
+                self.show_output(figure_name='activations_interactive', tau=tau, interactive=True)
             if show_trace is True or (show_trace == 'not_succeeded' and idx > n_steps-2):
                 self.show_trace(figure_name='trace_interactive', trace=trace, interactive=True)
-            if show_intermediate and ep % 100 == 99:
+            if show_intermediate and ep % 1000 == 999:
                 self.show_output(figure_name='activations_'+str(ep), tau=tau, interactive=False)
+            if show_weights is True:
+                self.show_weights(figure_name="weights", interactive=True)
+            if show_weights == 'intermediate' and ep % 1000 == 999:
+                self.show_weights(figure_name="weights_"+str(ep), interactive=False)
 
             print("  plot_t={:.4f}s".format(time()-t))
         #end for episodes
 
-        self.history.append({'episodes' :n_episodes,
-                             'steps' :n_steps,
-                             'init_learning_rate':init_learning_rate, 'duration_learingrate':duration_learingrate, 'target_learning_rate':target_learning_rate,
-                             'init_tau':init_tau, 'duration_tau':duration_tau, 'target_tau':target_tau,
-                             'eligibility_decay' :eligibility_decay,
-                             'step_penalty' :step_penalty,
-                             'sucess_indexes' :sucess_indexes})
+
         if save_to_file:
             self._store_to_file()
 
@@ -295,7 +306,7 @@ class MountainCarNeuronalNetwork(object):
 
     def _episode(self, mountain_car, learning_rate, reward_factor, eligibility_decay, n_steps, step_penalty, tau):
 
-        mountain_car.reset(random=False)
+        mountain_car.reset(random=True)
         self._reset_E() # set all e to 0
 
         curr_state = State(mountain_car.x, mountain_car.x_d)
@@ -319,11 +330,21 @@ class MountainCarNeuronalNetwork(object):
 
             curr_Q = self._get_Q(curr_state, curr_action, activs=curr_in_activs)
             next_Q = self._get_Q(next_state, next_action, activs=next_in_activs)
-            delta_q = learning_rate*(r + reward_factor*next_Q - curr_Q)
+            delta_q =  r + reward_factor*next_Q - curr_Q  #learning_rate*(r + reward_factor*next_Q - curr_Q)
 
-            self._increment_E(curr_state, curr_action, activs=curr_in_activs)
-            self._neurons_w += self._neurons_e*delta_q # self._update_Q(curr_state, curr_action, delta_q)
-            self._decay_E(eligibility_decay)
+            # update e
+            #self._increment_E(curr_state, curr_action, activs=curr_in_activs)
+            self._neurons_e[:, curr_action+1] += curr_in_activs
+
+            #update the weights
+            self._neurons_w += self._neurons_e*learning_rate*delta_q
+
+            #decay e
+            #self._decay_E(eligibility_decay)
+            self._neurons_e *= eligibility_decay*reward_factor
+            self._neurons_e[self._neurons_e > 1] = 1.0 # truncuate at 1
+            self._neurons_e[self._neurons_e < 0.000001] = 0.0 # set small values to 0
+
 
             curr_state = next_state
             curr_action = next_action
@@ -351,8 +372,8 @@ class MountainCarNeuronalNetwork(object):
         plt.yticks(self._y_ticks[0], self._y_ticks[1])
         plt.xlabel("position")
         plt.ylabel("velocity")
-        plt.pause(0.00000001)
         plt.show(block=block)
+        plt.pause(0.00000001)
 
     def show_output(self, figure_name, tau, block=False, interactive=False):
         """
@@ -368,21 +389,52 @@ class MountainCarNeuronalNetwork(object):
             plt.ioff()
         plt.figure(figure_name)
         plt.clf()
+        plt.title("output neuron activations (tau="+str(tau)+")")
         plt.imshow(outputs_matrix, interpolation='nearest')#, interpolation='gaussian')
         plt.xticks(self._x_ticks[0], self._x_ticks[1], rotation=90.0)
         plt.yticks(self._y_ticks[0], self._y_ticks[1])
         plt.xlabel("position")
         plt.ylabel("velocity")
-        plt.pause(0.00000001)
         plt.show(block=block)
+        plt.pause(0.00000001)
 
-    def print_weights(self):
+    def show_weights(self, figure_name, block=False, interactive=False):
         """
-        Shows the weights of each input neuron
+        Shows the highest weight of each input neuron
         """
-        # rotate by 90° to have position on x-axis and velocity on y-axis
-        weights_matrix = np.rot90(self._neurons_w.reshape((self._nbr_neurons_rows, self._nbr_neurons_cols, 3)), 1)
-        print(weights_matrix)
+
+        if interactive:
+            plt.ion()
+        else:
+            plt.ioff()
+        plt.figure(figure_name)
+        plt.clf()
+
+        vmin = np.min(self._neurons_w)
+        vmax = np.max(self._neurons_w)
+
+        # action weights
+        for a in range(3):
+            plt.subplot(2, 2, a+1)
+            plt.title(str(a-1))
+            weights = self._neurons_w[:, a]
+            weights_matrix = np.rot90(weights.reshape((self._nbr_neurons_rows, self._nbr_neurons_cols)), 1)
+            plt.imshow(weights_matrix, interpolation='nearest', vmin=vmin, vmax=vmax)
+
+        # max weights
+        plt.subplot(2, 2, 4)
+        plt.title("max")
+        weights = weights = np.max(self._neurons_w, axis=1)
+        weights_matrix = np.rot90(weights.reshape((self._nbr_neurons_rows, self._nbr_neurons_cols)), 1)
+        plt.imshow(weights_matrix, interpolation='nearest', vmin=vmin, vmax=vmax)
+
+
+        #plt.xticks(self._x_ticks[0], self._x_ticks[1], rotation=90.0)
+        #plt.yticks(self._y_ticks[0], self._y_ticks[1])
+        #plt.xlabel("position")
+        #plt.ylabel("velocity")
+        plt.show(block=block)
+        plt.pause(0.00000001)
 
     def show_trace(self, figure_name, trace, block=False, interactive=False):
         """
@@ -395,11 +447,157 @@ class MountainCarNeuronalNetwork(object):
             plt.ioff()
         plt.figure(figure_name)
         plt.clf()
-        plt.plot([s.x for s in trace], [s.v for s in trace],linewidth=2, c="green")
+        plt.plot([s.x for s in trace], [s.v for s in trace],c="green")
+        plt.plot(trace[0].x, trace[0].v, 'ro', linewidth=2, c="red") #start
+        plt.plot(trace[-1].x, trace[-1].v, 'bo', linewidth=2, c="blue") #end
         plt.xlim(self._x_vals[0],self._x_vals[-1])
         plt.ylim(self._v_vals[0],self._v_vals[-1])
-        plt.pause(0.00000001)
         plt.show(block=block)
+        plt.pause(0.00000001)
+
+    def show_learningcurve(self, figure_name, block=False):
+        """
+        shows the learning curve of this network
+        """
+        plt.figure(figure_name)
+        plt.clf()
+
+        sucess_indexes = []
+        for h in self.history:
+            sucess_indexes += h['sucess_indexes']
+        plt.plot(sucess_indexes, '.')
+        W = min(max(len(sucess_indexes)//5, 10), 500) # window is 1/5th of total length and between 10 and 500
+        mean_arr = [np.mean(sucess_indexes[k-W:k]) for k in range(W, len(sucess_indexes))]
+        plt.plot(range(W, len(mean_arr)+W), mean_arr, 'r', linewidth=2)
+
+        plt.xlabel("epoche")
+        plt.ylabel("steps until succeded")
+        plt.show(block=block)
+        plt.pause(0.00000001)
+
+    def show_parameter_history(self, figure_name, block=False):
+        """
+        shows the parameter history of this network
+        """
+        def _exponential_decay(start_val, end_val, duration, min_val, array_length):
+            factor = (end_val / start_val)**(1.0/duration)
+            val = start_val
+            arr = [val]
+            for k in range(0, array_length):
+                val *= factor
+                if val < min_val:
+                    nbr_left = array_length - len(arr)
+                    arr += [min_val]*nbr_left
+                    return arr
+                arr.append(val)
+            return arr
+
+        plt.figure(figure_name)
+        plt.clf()
+        # parameters
+        #   learning rate
+        lrs = []
+        #   tau
+        taus = []
+        #   reward_factor
+        rfs = []
+        #   eligibility_decay
+        eds = []
+        # step_penalty
+        sps = []
+
+        # vertical lines to show training changes
+        vls = []
+
+        for h in self.history:
+            #   learning rate
+            lrs += _exponential_decay(h["init_learning_rate"], h["target_learning_rate"], h["duration_learingrate"], h["min_learning_rate"], h["episodes"])
+            #   tau
+            taus += _exponential_decay(h["init_tau"], h["target_tau"], h["duration_tau"], h["min_tau"], h["episodes"])
+            #   reward_factor
+            rfs += [h["reward_factor"]]*h["episodes"]
+            #   eligibility_decay
+            eds += [h["eligibility_decay"]]*h["episodes"]
+            # step_penalty
+            sps += [h["step_penalty"]]*h["episodes"]
+
+            # vertical lines to show training changes
+            if len(vls) > 0:
+                vls.append(h["episodes"]+vls[-1])
+            else:
+                vls.append(h["episodes"])
+
+
+
+        plt.figure(figure_name)
+        rows = 3
+        cols = 2
+        k = 1
+        #   learning rate
+        plt.subplot(rows, cols, k)
+        plt.title("learning rate")
+        plt.plot(lrs)
+        plt.vlines(vls, plt.ylim()[0], plt.ylim()[1], colors='r', linestyles='dashdot')
+        k += 1
+
+        #   tau
+        plt.subplot(rows, cols, k)
+        plt.title("tau")
+        plt.plot(taus)
+        plt.vlines(vls, plt.ylim()[0], plt.ylim()[1], colors='r', linestyles='dashdot')
+        k += 1
+
+        #   reward_factor
+        plt.subplot(rows, cols, k)
+        plt.title("reward_factor")
+        plt.plot(rfs)
+        plt.vlines(vls, plt.ylim()[0], plt.ylim()[1], colors='r', linestyles='dashdot')
+        k += 1
+
+        #   eligibility_decay
+        plt.subplot(rows, cols, k)
+        plt.title("eligibility_decay")
+        plt.plot(eds)
+        plt.vlines(vls, plt.ylim()[0], plt.ylim()[1], colors='r', linestyles='dashdot')
+        k += 1
+
+        # step_penalty
+        plt.subplot(rows, cols, k)
+        plt.title("step_penalty")
+        plt.plot(sps)
+        plt.vlines(vls, plt.ylim()[0], plt.ylim()[1], colors='r', linestyles='dashdot')
+        k += 1
+
+        plt.show(block=block)
+        plt.pause(0.00000001)
+
+    def display_network(self, name=None, block=False):
+
+        if name is None:
+            name = "r{}_c{}_{}".format(self._nbr_neurons_rows, self._nbr_neurons_cols, strftime('%d_%m_%Y-%H:%M:%S'))
+        # weights
+        self.show_weights(figure_name="weights:"+name)
+
+        # output (actions)
+        last_tau = max(self.history[-1]['target_tau'], self.history[-1]["min_tau"])
+        self.show_output(figure_name="output_tau="+str(last_tau)+":"+name, tau=last_tau)
+        self.show_output(figure_name="output_tau=0.5:"+name, tau=0.5)
+
+        # vector field
+        # TODO
+
+        # learning curve
+        self.show_learningcurve(figure_name="learningcurve:"+name)
+
+        # parameters
+        self.show_parameter_history(figure_name="parameters:"+name)
+
+        # show it
+        plt.show(block=block)
+        plt.pause(0.00000001)
+
+
+
 
     def mean_positivenegative_v(self, delim="\n"):
         """
@@ -411,7 +609,7 @@ class MountainCarNeuronalNetwork(object):
         s += "negative_v: {}{}".format(np.mean(negative_v_w, axis=0), delim)
         return s
 
-    def __str__(self, history=False):
+    def __str__(self, history=True):
         s = "Neural Network:\n"
         for n in range(self.nbr_neurons):
             pos_s = "({:.2f}, {:.2f})".format(float(self._neurons_pos[n, 0]), float(self._neurons_pos[n, 1]))
