@@ -48,6 +48,6 @@ if __name__ == "__main__":
     succ_idxs_smoothed = list(succ_idxs_averaged[:3]) + list(smoothTriangle(succ_idxs_averaged, degree=2, dropVals=True)) + list(succ_idxs_averaged[-3:])
 
     # plot them
-    plt.plot(range(len(succ_idxs_averaged)), succ_idxs_averaged, 'ro', linewidth=2)
+    #plt.plot(range(len(succ_idxs_averaged)), succ_idxs_averaged, 'ro', linewidth=2)
     plt.plot(range(len(succ_idxs_smoothed)), succ_idxs_smoothed, 'r-', linewidth=5)
     plt.show(block=True)

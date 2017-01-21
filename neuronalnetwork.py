@@ -286,10 +286,10 @@ class MountainCarNeuronalNetwork(object):
             # show some stuff
             if show_interactive:
                 self.show_output(figure_name='activations_interactive', tau=tau, interactive=True)
-                self.show_vector_field(figure_name='vector field interactive', tau=tau, interactive=True)
+                #self.show_vector_field(figure_name='vector field interactive', tau=tau, interactive=True)
             if show_trace is True or (show_trace == 'not_succeeded' and idx > n_steps-2):
                 self.show_trace(figure_name='trace_interactive', trace=trace, interactive=True)
-            if show_intermediate and ep % 1000 == 999:
+            if show_intermediate and ep % 100 == 99:
                 self.show_output(figure_name='activations_'+str(ep), tau=tau, interactive=False)
                 self.show_vector_field(figure_name='vector field'+str(ep), tau=tau, interactive=False)
             if show_weights is True:
@@ -370,7 +370,7 @@ class MountainCarNeuronalNetwork(object):
         if activs is None:
             activs = self._input_neuron_activations(state)
         # reshape and rotate by 90
-        activs_matrix = np.rot90(activs.reshape((self._nbr_neurons_rows, self._nbr_neurons_cols)), 1)
+        activs_matrix = np.rot90(activs.reshape((self._nbr_neurons_cols, self._nbr_neurons_rows)), 1)
 
         plt.ion()
         plt.figure("activation")
@@ -390,8 +390,7 @@ class MountainCarNeuronalNetwork(object):
         outputs_arr = np.array([self.output_activations(State(n_x, n_v), tau) for n_x, n_v in self._neurons_pos])
 
         # reshape and rotate by 90
-        outputs_matrix = np.rot90(outputs_arr.reshape((self._nbr_neurons_rows, self._nbr_neurons_cols, 3)), 1)
-	print(outputs_matrix)
+        outputs_matrix = np.rot90(outputs_arr.reshape((self._nbr_neurons_cols, self._nbr_neurons_rows, 3)), 1)
         if interactive:
             plt.ion()
         else:
@@ -410,13 +409,13 @@ class MountainCarNeuronalNetwork(object):
     def show_vector_field(self, figure_name, tau, block=False, interactive=False):
         """
         Shows the vector fields of the activations on each neurons of the grid.
-	"""
-        #Get the actions	
+        """
+        #Get the actions
         outputs_arr = np.array([self.output_activations(State(n_x, n_v), tau) for n_x, n_v in self._neurons_pos])
-	# reshape and rotate by 90
+        # reshape and rotate by 90
         outputs_matrix = np.rot90(np.fliplr(outputs_arr.reshape((self._nbr_neurons_rows, self._nbr_neurons_cols, 3))),1)
-	
-	vectors = outputs_matrix[:,:,2] - outputs_matrix[:,:,0]	
+
+        vectors = outputs_matrix[:,:,2] - outputs_matrix[:,:,0]
         if interactive:
             plt.ion()
         else:
@@ -425,15 +424,15 @@ class MountainCarNeuronalNetwork(object):
         plt.clf()
         plt.title("vector field of direction probability (tau="+str(tau)+")")
         plt.quiver(-vectors, np.zeros((self._nbr_neurons_rows, self._nbr_neurons_cols)), -vectors, units='x', scale=1.1, scale_units='x')
-	cbar = plt.colorbar()
-	cbar.set_label('Magnitude and direction', rotation=270)
-	plt.xticks(self._x_ticks[0], self._x_ticks[1], rotation=90.0)
+        cbar = plt.colorbar()
+        cbar.set_label('Magnitude and direction', rotation=270)
+        plt.xticks(self._x_ticks[0], self._x_ticks[1], rotation=90.0)
         plt.yticks(self._y_ticks[0], self._y_ticks[1])
         plt.xlabel("position")
         plt.ylabel("velocity")
         plt.show(block=block)
         plt.pause(0.00000001)
-	
+
     def show_weights(self, figure_name, block=False, interactive=False):
         """
         Shows the highest weight of each input neuron
@@ -454,7 +453,7 @@ class MountainCarNeuronalNetwork(object):
             plt.subplot(2, 2, a+1)
             plt.title(str(a-1))
             weights = self._neurons_w[:, a]
-            weights_matrix = np.rot90(weights.reshape((self._nbr_neurons_rows, self._nbr_neurons_cols)), 1)
+            weights_matrix = np.rot90(weights.reshape((self._nbr_neurons_cols, self._nbr_neurons_rows)), 1)
             plt.imshow(weights_matrix, interpolation='nearest', vmin=vmin, vmax=vmax)
             plt.xticks(self._x_ticks[0], self._x_ticks[1], rotation=90.0)
             plt.yticks(self._y_ticks[0], self._y_ticks[1])
@@ -465,7 +464,7 @@ class MountainCarNeuronalNetwork(object):
         plt.subplot(2, 2, 4)
         plt.title("max")
         weights = weights = np.max(self._neurons_w, axis=1)
-        weights_matrix = np.rot90(weights.reshape((self._nbr_neurons_rows, self._nbr_neurons_cols)), 1)
+        weights_matrix = np.rot90(weights.reshape((self._nbr_neurons_cols, self._nbr_neurons_rows)), 1)
         plt.imshow(weights_matrix, interpolation='nearest', vmin=vmin, vmax=vmax)
         plt.xticks(self._x_ticks[0], self._x_ticks[1], rotation=90.0)
         plt.yticks(self._y_ticks[0], self._y_ticks[1])
@@ -624,7 +623,7 @@ class MountainCarNeuronalNetwork(object):
         self.show_output(figure_name="output_tau=0.5:"+name, tau=0.5)
 
         # vector field
-        self.show_vector_field(figure_name="vector field", tau= last_tau)
+        self.show_vector_field(figure_name="vector field", tau=last_tau)
 
         # learning curve
         self.show_learningcurve(figure_name="learningcurve:"+name)

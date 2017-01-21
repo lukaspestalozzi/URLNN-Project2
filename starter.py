@@ -100,13 +100,13 @@ class SarsaAgent():
                              target_learning_rate=0.02,
                              min_learning_rate=0.02,
                              init_tau=1.0,
-                             duration_tau=100,
+                             duration_tau=150,
                              target_tau=0.01,
-                             min_tau=0.01, # to ensure some exploration (similar to e-greedy)
+                             min_tau=0.01,
                              save_to_file=True,
                              show_intermediate=False,
                              show_trace=False,
-                             show_interactive=True,
+                             show_interactive=False,
                              show_weights=False)
 
 
