@@ -1,7 +1,10 @@
+
+
 # My stuff
 .ipynb_checkpoints/
 *.zip
 networks/
+*~
 
 # Python stuff
 # Byte-compiled / optimized / DLL files
