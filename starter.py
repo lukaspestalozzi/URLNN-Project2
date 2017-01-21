@@ -104,9 +104,9 @@ class SarsaAgent():
                              target_tau=0.01,
                              min_tau=0.01,
                              save_to_file=True,
-                             show_intermediate=False,
+                             show_intermediate=True,
                              show_trace=False,
-                             show_interactive=False,
+                             show_interactive=True,
                              show_weights=False)
 
 

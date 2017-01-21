@@ -112,7 +112,7 @@ class MountainCarNeuronalNetwork(object):
             nepochs += len(h['sucess_indexes'])
         filename = '{}{}_{}.json'.format(path,strftime('%d_%m_%Y-%H:%M:%S'), nepochs)
         with open(filename, 'w') as f:
-            print("saving NN to "+filename, end="")
+            #print("saving NN to "+filename, end="")
             json.dump(d, f)
             print("...done saving")
 
@@ -286,7 +286,7 @@ class MountainCarNeuronalNetwork(object):
             # show some stuff
             if show_interactive:
                 self.show_output(figure_name='activations_interactive', tau=tau, interactive=True)
-                #self.show_vector_field(figure_name='vector field interactive', tau=tau, interactive=True)
+                self.show_vector_field(figure_name='vector field interactive', tau=tau, interactive=True)
             if show_trace is True or (show_trace == 'not_succeeded' and idx > n_steps-2):
                 self.show_trace(figure_name='trace_interactive', trace=trace, interactive=True)
             if show_intermediate and ep % 100 == 99:
@@ -398,6 +398,7 @@ class MountainCarNeuronalNetwork(object):
         plt.figure(figure_name)
         plt.clf()
         plt.title("output neuron activations (tau="+str(tau)+")")
+	outputs_matrix[:,:,[0,1,2]] = outputs_matrix[:,:,[2,1,0]]
         plt.imshow(outputs_matrix, interpolation='nearest')#, interpolation='gaussian')
         plt.xticks(self._x_ticks[0], self._x_ticks[1], rotation=90.0)
         plt.yticks(self._y_ticks[0], self._y_ticks[1])
@@ -409,24 +410,31 @@ class MountainCarNeuronalNetwork(object):
     def show_vector_field(self, figure_name, tau, block=False, interactive=False):
         """
         Shows the vector fields of the activations on each neurons of the grid.
-        """
-        #Get the actions
+	"""
+        #Get the actions	
         outputs_arr = np.array([self.output_activations(State(n_x, n_v), tau) for n_x, n_v in self._neurons_pos])
-        # reshape and rotate by 90
-        outputs_matrix = np.rot90(np.fliplr(outputs_arr.reshape((self._nbr_neurons_rows, self._nbr_neurons_cols, 3))),1)
-
-        vectors = outputs_matrix[:,:,2] - outputs_matrix[:,:,0]
+	# reshape and rotate by 90
+        outputs_matrix = np.rot90(np.fliplr(outputs_arr.reshape((self._nbr_neurons_cols, self._nbr_neurons_rows, 3))),1)
+	
+	max_q_indices = np.argmax(outputs_matrix, axis=2)
+	max_q = np.max(outputs_matrix, axis=2)
+	vectors = np.copy(max_q_indices)
+	vectors[vectors == 0] = -1
+	vectors[vectors == 1] = 0
+	vectors[vectors == 2] = 1
+	color = max_q*vectors
+	
         if interactive:
             plt.ion()
         else:
             plt.ioff()
         plt.figure(figure_name)
         plt.clf()
-        plt.title("vector field of direction probability (tau="+str(tau)+")")
-        plt.quiver(-vectors, np.zeros((self._nbr_neurons_rows, self._nbr_neurons_cols)), -vectors, units='x', scale=1.1, scale_units='x')
-        cbar = plt.colorbar()
-        cbar.set_label('Magnitude and direction', rotation=270)
-        plt.xticks(self._x_ticks[0], self._x_ticks[1], rotation=90.0)
+        plt.title("Vector field of Activations and Q values (tau="+str(tau)+")")
+        plt.quiver(color, np.zeros((self._nbr_neurons_rows, self._nbr_neurons_cols)), color, units='x', scale=1, scale_units='x')
+	cbar = plt.colorbar()
+	cbar.set_label('Q Value * direction', rotation=270)
+	plt.xticks(self._x_ticks[0], self._x_ticks[1], rotation=90.0)
         plt.yticks(self._y_ticks[0], self._y_ticks[1])
         plt.xlabel("position")
         plt.ylabel("velocity")
