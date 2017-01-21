@@ -16,7 +16,7 @@ class MountainCarNeuronalNetwork(object):
 
     def __init__(self, warm_start=None, nbr_neuron_rows=10, nbr_neuron_cols=15, init_weight=None,
                  x_min=-150, x_max=5, v_min=-15, v_max=15,
-                 cheat=False):
+                 cheat=False, print_nn=True):
         """
         warm_start: json file name from where to read the state of the NN, if this is not None, all other parameters are ignored
         cheat: if True, initial weights are set such that the car always accelerates in the direction it travels. (default False)
@@ -80,17 +80,15 @@ class MountainCarNeuronalNetwork(object):
 
         # print the network
         print(self.__str__())
-        print("sigma_x", self._sigma_x, "sigma_v", self._sigma_v)
 
     def _read_from_file(self, filename):
-        print("reading NN")
+        print("reading NN from "+filename)
         with open(filename, 'r') as f:
             d = json.load(f)
-            #print(d)
             return d
         return None
 
-    def _store_to_file(self):
+    def _store_to_file(self, path=None):
         def assure_path_exists(path):
             folder = os.path.dirname(path)
             if not os.path.exists(folder):
@@ -105,14 +103,18 @@ class MountainCarNeuronalNetwork(object):
             'weights':self._neurons_w.tolist(),
             'history':self.history
         }
-        print("saving NN:\n")
-        path = 'networks/r{}_c{}_e{}_sp{}/'.format(self._nbr_neurons_rows, self._nbr_neurons_cols, self.history[-1]['eligibility_decay'], self.history[-1]['step_penalty'])
-        #path = 'networks/average_10/'
+        if path is None:
+            path = 'networks/r{}_c{}_e{}_sp{}/'.format(self._nbr_neurons_rows, self._nbr_neurons_cols, self.history[-1]['eligibility_decay'], self.history[-1]['step_penalty'])
         assure_path_exists(path)
-        filename = '{}nn_{}.json'.format(path, strftime('%d_%m_%Y-%H:%M:%S'))
+        # calculate how many epoches it was trained for
+        nepochs = 0
+        for h in self.history:
+            nepochs += len(h['sucess_indexes'])
+        filename = '{}{}_{}.json'.format(path,strftime('%d_%m_%Y-%H:%M:%S'), nepochs)
         with open(filename, 'w') as f:
+            print("saving NN to "+filename, end="")
             json.dump(d, f)
-        print("done saving")
+            print("...done saving")
 
     def _get_Q(self, state, action, activs=None):
         # calculate the activation of all neurons
@@ -150,13 +152,13 @@ class MountainCarNeuronalNetwork(object):
         q = self._get_Q_all(state, activs=in_activs)
         denominator = np.sum(np.exp(q / tau))
 
-        if denominator == np.inf or denominator == np.nan: # handle nummeric overflow
-            print("(info: overflow occured)")
+        if denominator == np.inf or denominator == np.nan or denominator <= 0.0: # handle nummeric overflow
+            #print("(info: overflow occured)")
             return self._greedy_output(q)
 
         op_activs = np.exp(q / tau) / denominator
         if np.inf in op_activs or np.nan in op_activs: # handle nummeric overflow
-            print("(info: overflow occured)")
+            #print("(info: overflow occured)")
             return self._greedy_output(q)
         else:
             return op_activs
@@ -218,12 +220,14 @@ class MountainCarNeuronalNetwork(object):
               init_tau, duration_tau, target_tau,
               min_learning_rate=0.005,
               min_tau=0.01, # must not be lower than 0.01
-              step_penalty=-0.1, mountain_car=None, save_to_file=True, show_intermediate=False,
+              step_penalty=-0.1, mountain_car=None,
+              save_to_file=True,
+              show_intermediate=False,
               show_trace=False, show_interactive=True, show_weights=False):
         """
         duration_*: positive integer. Determines at which episode the * parameter reaches it's minimum value. Note that the parameter continues to shrink when it reached the target_learning_rate value.
         min_*: spezifies a lower bound on the * parameter
-        save_to_file: if True, then stores the NN after the training to a file.
+        save_to_file: if True, then stores the NN after the training to a file. can be a string (directory where to store the NN)
         show_intermediate: if True, shows a plot all 100 episodes
         show_trace: if True, shows the trace of the car for each episode
         """
@@ -294,9 +298,11 @@ class MountainCarNeuronalNetwork(object):
             print("  plot_t={:.4f}s".format(time()-t))
         #end for episodes
 
-
-        if save_to_file:
+        # save the NN
+        if save_to_file is True:
             self._store_to_file()
+        elif isinstance(save_to_file, str):
+            self._store_to_file(path=save_to_file)
 
         # concatenate all previous success_indexes
         ret_si = []
@@ -420,6 +426,10 @@ class MountainCarNeuronalNetwork(object):
             weights = self._neurons_w[:, a]
             weights_matrix = np.rot90(weights.reshape((self._nbr_neurons_rows, self._nbr_neurons_cols)), 1)
             plt.imshow(weights_matrix, interpolation='nearest', vmin=vmin, vmax=vmax)
+            plt.xticks(self._x_ticks[0], self._x_ticks[1], rotation=90.0)
+            plt.yticks(self._y_ticks[0], self._y_ticks[1])
+            plt.xlabel("position")
+            plt.ylabel("velocity")
 
         # max weights
         plt.subplot(2, 2, 4)
@@ -427,12 +437,12 @@ class MountainCarNeuronalNetwork(object):
         weights = weights = np.max(self._neurons_w, axis=1)
         weights_matrix = np.rot90(weights.reshape((self._nbr_neurons_rows, self._nbr_neurons_cols)), 1)
         plt.imshow(weights_matrix, interpolation='nearest', vmin=vmin, vmax=vmax)
+        plt.xticks(self._x_ticks[0], self._x_ticks[1], rotation=90.0)
+        plt.yticks(self._y_ticks[0], self._y_ticks[1])
+        plt.xlabel("position")
+        plt.ylabel("velocity")
 
 
-        #plt.xticks(self._x_ticks[0], self._x_ticks[1], rotation=90.0)
-        #plt.yticks(self._y_ticks[0], self._y_ticks[1])
-        #plt.xlabel("position")
-        #plt.ylabel("velocity")
         plt.show(block=block)
         plt.pause(0.00000001)
 
@@ -466,9 +476,9 @@ class MountainCarNeuronalNetwork(object):
         for h in self.history:
             sucess_indexes += h['sucess_indexes']
         plt.plot(sucess_indexes, '.')
-        W = min(max(len(sucess_indexes)//5, 10), 500) # window is 1/5th of total length and between 10 and 500
-        mean_arr = [np.mean(sucess_indexes[k-W:k]) for k in range(W, len(sucess_indexes))]
-        plt.plot(range(W, len(mean_arr)+W), mean_arr, 'r', linewidth=2)
+        W = 5
+        mean_arr = [np.mean(sucess_indexes[max(0, k-W):k]) for k in range(1, len(sucess_indexes))]
+        plt.plot(range(1, len(mean_arr)+1), mean_arr, 'r', linewidth=2)
 
         plt.xlabel("epoche")
         plt.ylabel("steps until succeded")
@@ -617,7 +627,10 @@ class MountainCarNeuronalNetwork(object):
             e_s = "{}".format([float("{:.2f}".format(e)) for e in self._neurons_e[n]])
             s += "{}: {} {}\n".format(pos_s, w_s, e_s)
 
+
+        s += "sigma_x: {}, sigma_v: {}\n".format(self._sigma_x, self._sigma_v)
         s += self.mean_positivenegative_v()
+
         if history:
             s += "history: "+str(self.history)
         return s

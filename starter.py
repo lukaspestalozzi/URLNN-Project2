@@ -71,38 +71,43 @@ class SarsaAgent():
 
         self.NN = nn.MountainCarNeuronalNetwork(warm_start=warm_start, nbr_neuron_rows=20, nbr_neuron_cols=20, init_weight=0.5)
 
-    def save_nn(self):
-        self.NN._store_to_file()
+    def save_nn(self, directory=None):
+        """
+        directory: saves the NN into the directory
+        """
+        self.NN._store_to_file(path=directory)
 
     def choose_action(self, state):
         return self.NN.choose_action(state)
 
-    def train(self, n_steps=None, n_episodes=None):
+    def train_and_show(self, n_steps=None, n_episodes=None):
         print("NN history:", self.NN.history)
         self.NN.show_output(figure_name='start', tau=0.5)
-        epis = 11000 if n_episodes is None else n_episodes
-        self.NN.train( n_steps=2000 if n_steps is None else n_steps,
-                       n_episodes=epis,
-                       reward_factor=0.95,
-                       eligibility_decay=0.9,
-                       step_penalty=-0.0,
-                       init_learning_rate=0.15,
-                       duration_learingrate=6000,
-                       target_learning_rate=0.02,
-                       min_learning_rate=0.02,
-                       init_tau=1.0,
-                       duration_tau=10000,
-                       target_tau=0.01,
-                       min_tau=0.01, # to ensure some exploration (similar to e-greedy)
-                       save_to_file=True,
-                       show_intermediate=False,
-                       show_trace=False,
-                       show_interactive=False,
-                       show_weights=False)
-
+        self.train(n_steps, n_episodes)
         print(self.NN)
         self.NN.display_network(name="after training")
 
+
+    def train(self, n_steps=None, n_episodes=None):
+        epis = 300 if n_episodes is None else n_episodes
+        return self.NN.train(n_steps=2000 if n_steps is None else n_steps,
+                             n_episodes=epis,
+                             reward_factor=0.95,
+                             eligibility_decay=0.9,
+                             step_penalty=-0.0,
+                             init_learning_rate=0.15,
+                             duration_learingrate=100,
+                             target_learning_rate=0.02,
+                             min_learning_rate=0.02,
+                             init_tau=1.0,
+                             duration_tau=100,
+                             target_tau=0.01,
+                             min_tau=0.01, # to ensure some exploration (similar to e-greedy)
+                             save_to_file=True,
+                             show_intermediate=False,
+                             show_trace=False,
+                             show_interactive=True,
+                             show_weights=False)
 
 
 if __name__ == "__main__":
@@ -115,7 +120,7 @@ if __name__ == "__main__":
 
     agent = SarsaAgent(warm_start=args.filename)
     try:
-        agent.train(n_steps=args.n_steps, n_episodes=args.n_episodes)
+        agent.train_and_show(n_steps=args.n_steps, n_episodes=args.n_episodes)
         plb.show(block=True)
     except KeyboardInterrupt:
         agent.save_nn()
